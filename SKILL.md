@@ -2,7 +2,7 @@
 name: posthog-growth-engineer
 description: Growth Engineer for mobile apps and agent runtimes using PostHog MCP as the product analytics baseline. Correlate PostHog analytics, surveys, experiments, error tracking, RevenueCat, Sentry or GlitchTip, App Store Connect, reviews, and repo context into implementation-ready proposals, GitHub issues, or draft PRs.
 license: MIT-0
-homepage: https://clawhub.ai/wotaso-dev/growth-engineer
+homepage: https://github.com/ekurutepe/posthog-growth-engineer
 metadata:
   author: local
   forked-from: wotaso-dev/growth-engineer
