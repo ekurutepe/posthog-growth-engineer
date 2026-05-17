@@ -1,0 +1,16 @@
+.DS_Store
+node_modules/
+npm-debug.log*
+
+data/posthog-growth-engineer/config.json
+data/posthog-growth-engineer/state.json
+data/posthog-growth-engineer/runtime/
+data/posthog-growth-engineer/asc-cache/
+data/posthog-growth-engineer/feedback-api/
+data/posthog-growth-engineer/issues.generated.json
+data/posthog-growth-engineer/posthog_mcp_summary.json
+data/posthog-growth-engineer/posthog_feedback_summary.json
+
+.posthog-growth-secrets.env
+.openclaw/
+HEARTBEAT.md

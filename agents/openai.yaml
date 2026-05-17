@@ -1,0 +1,13 @@
+interface:
+  display_name: "PostHog Growth Engineer"
+  short_description: "Growth analysis with PostHog MCP signals"
+  default_prompt: "Use $posthog-growth-engineer to analyze PostHog MCP analytics, stability, revenue, store, and repo context into implementation-ready growth proposals."
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "posthog"
+      description: "PostHog MCP server for product analytics, schema, insights, SQL, experiments, surveys, and error-tracking context"
+      transport: "streamable_http"
+      url: "https://mcp.posthog.com/mcp"
+policy:
+  allow_implicit_invocation: true

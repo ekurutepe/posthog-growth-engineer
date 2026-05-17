@@ -1,0 +1,37 @@
+{
+  "project": "ring-sizer",
+  "window": "last_30d",
+  "queries": [
+    {
+      "name": "activation_funnel_by_app_version",
+      "tool": "query-run",
+      "resultSummary": "Activation completion dropped for iOS 1.8.0 users after onboarding step 2."
+    }
+  ],
+  "events": [
+    { "event": "onboarding_started", "count": 4200, "users": 3900 },
+    { "event": "onboarding_completed", "count": 1800, "users": 1700 },
+    { "event": "paywall_viewed", "count": 1600, "users": 1500 }
+  ],
+  "signals": [
+    {
+      "id": "posthog_activation_drop_ios_1_8",
+      "title": "Activation dropped for iOS 1.8.0",
+      "area": "onboarding",
+      "priority": "high",
+      "metric": "onboarding_completion",
+      "current_value": 0.41,
+      "baseline_value": 0.56,
+      "delta_percent": -26.8,
+      "evidence": [
+        "PostHog MCP funnel shows onboarding completion dropped from 56% to 41%",
+        "Drop is concentrated in appVersion=1.8.0 on iOS"
+      ],
+      "suggested_actions": [
+        "Inspect onboarding step 2 changes in the 1.8.0 release",
+        "Add step-level logging around permission and profile creation outcomes"
+      ],
+      "confidence": "medium"
+    }
+  ]
+}

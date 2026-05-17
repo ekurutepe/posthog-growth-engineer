@@ -1,0 +1,214 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import {
+  buildHermesCronCreateCommand,
+  buildHermesCronVerification,
+  buildOpenClawCronAddCommand,
+  buildOpenClawCronVerification,
+  buildGrowthRunnerCommand,
+  buildOpenClawGrowthSystemEvent,
+  deriveSchedulerProofPathFromStatePath,
+  deriveStatePathFromConfigPath,
+  evaluateOpenClawCronRecords,
+  evaluateOpenClawCronText,
+  getGitHubArtifactModes,
+  shouldAutoCreateGitHubArtifact,
+} from '../scripts/openclaw-growth-shared.mjs';
+
+test('shouldAutoCreateGitHubArtifact auto-enables issues when GitHub token and repo are configured', () => {
+  const previousToken = process.env.GITHUB_TOKEN;
+  process.env.GITHUB_TOKEN = 'test-token';
+  try {
+    assert.equal(
+      shouldAutoCreateGitHubArtifact({
+        project: { githubRepo: 'owner/repo' },
+        actions: { mode: 'issue', autoCreateIssues: false },
+      }),
+      true,
+    );
+  } finally {
+    if (previousToken === undefined) {
+      delete process.env.GITHUB_TOKEN;
+    } else {
+      process.env.GITHUB_TOKEN = previousToken;
+    }
+  }
+});
+
+test('shouldAutoCreateGitHubArtifact respects explicit GitHub artifact opt-out', () => {
+  const previousToken = process.env.GITHUB_TOKEN;
+  process.env.GITHUB_TOKEN = 'test-token';
+  try {
+    assert.equal(
+      shouldAutoCreateGitHubArtifact({
+        project: { githubRepo: 'owner/repo' },
+        actions: { mode: 'issue', disableAutoCreateGitHubArtifacts: true },
+      }),
+      false,
+    );
+  } finally {
+    if (previousToken === undefined) {
+      delete process.env.GITHUB_TOKEN;
+    } else {
+      process.env.GITHUB_TOKEN = previousToken;
+    }
+  }
+});
+
+test('getGitHubArtifactModes supports multiple selected GitHub artifact outputs', () => {
+  assert.deepEqual(
+    getGitHubArtifactModes({
+      actions: {
+        outputDestinations: ['openclaw_chat', 'github_issue', 'github_pull_request'],
+        autoCreateIssues: true,
+        autoCreatePullRequests: true,
+      },
+      deliveries: {
+        github: {
+          modes: ['issue', 'pull_request'],
+        },
+      },
+    }),
+    ['issue', 'pull_request'],
+  );
+});
+
+test('explicit chat-only output destinations disable GitHub artifact fallback', () => {
+  const previousToken = process.env.GITHUB_TOKEN;
+  process.env.GITHUB_TOKEN = 'test-token';
+  try {
+    const config = {
+      project: { githubRepo: 'owner/repo' },
+      actions: {
+        mode: 'issue',
+        outputDestinations: ['openclaw_chat'],
+        autoCreateIssues: false,
+        autoCreatePullRequests: false,
+      },
+    };
+    assert.deepEqual(getGitHubArtifactModes(config), []);
+    assert.equal(shouldAutoCreateGitHubArtifact(config), false);
+  } finally {
+    if (previousToken === undefined) {
+      delete process.env.GITHUB_TOKEN;
+    } else {
+      process.env.GITHUB_TOKEN = previousToken;
+    }
+  }
+});
+
+test('OpenClaw cron commands keep state and proof beside the active config', () => {
+  const configPath = '/home/lo/data/posthog-growth-engineer/config.json';
+  const statePath = '/home/lo/data/posthog-growth-engineer/state.json';
+  const proofPath = '/home/lo/data/posthog-growth-engineer/runtime/scheduler-proof.jsonl';
+
+  assert.equal(deriveStatePathFromConfigPath(configPath), statePath);
+  assert.equal(deriveSchedulerProofPathFromStatePath(statePath), proofPath);
+  assert.equal(
+    buildGrowthRunnerCommand(configPath),
+    `node scripts/openclaw-growth-runner.mjs --config ${configPath} --state ${statePath}`,
+  );
+
+  const eventText = buildOpenClawGrowthSystemEvent(configPath, {});
+  assert.match(eventText, new RegExp(`--state ${statePath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`));
+  assert.match(eventText, new RegExp(proofPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+});
+
+test('OpenClaw cron verification rejects stale name-only jobs', () => {
+  const configPath = 'data/posthog-growth-engineer/config.json';
+  const verification = buildOpenClawCronVerification(configPath, {});
+
+  const stale = evaluateOpenClawCronRecords(
+    {
+      jobs: [
+        {
+          name: 'PostHog Growth Engineer scheduler',
+          schedule: '*/30 * * * *',
+          timezone: 'UTC',
+          systemEvent: 'Temporary Growth Engineer demo notification only',
+        },
+      ],
+    },
+    verification,
+  );
+
+  assert.equal(stale.exists, true);
+  assert.equal(stale.verified, false);
+  assert.equal(stale.reason, 'missing_required_fragments');
+});
+
+test('OpenClaw cron verification accepts jobs wired to the runner contract', () => {
+  const configPath = 'data/posthog-growth-engineer/config.json';
+  const addCommand = buildOpenClawCronAddCommand(configPath, {});
+  const verification = buildOpenClawCronVerification(configPath, {});
+
+  const parsed = evaluateOpenClawCronRecords(
+    {
+      jobs: [
+        {
+          name: 'PostHog Growth Engineer scheduler',
+          schedule: '*/30 * * * *',
+          timezone: 'UTC',
+          command: addCommand,
+        },
+      ],
+    },
+    verification,
+  );
+
+  assert.equal(parsed.exists, true);
+  assert.equal(parsed.verified, true);
+
+  const text = evaluateOpenClawCronText(addCommand, verification);
+  assert.equal(text.exists, true);
+  assert.equal(text.verified, true);
+});
+
+test('Hermes cron verification rejects stale name-only jobs', () => {
+  const configPath = 'data/posthog-growth-engineer/config.json';
+  const workdir = '/srv/example-app';
+  const verification = buildHermesCronVerification(configPath, {}, { workdir });
+
+  const stale = evaluateOpenClawCronRecords(
+    {
+      jobs: [
+        {
+          name: 'Hermes PostHog Growth Engineer scheduler',
+          schedule: '*/30 * * * *',
+          prompt: 'Old placeholder task',
+        },
+      ],
+    },
+    verification,
+  );
+
+  assert.equal(stale.exists, true);
+  assert.equal(stale.verified, false);
+  assert.equal(stale.reason, 'missing_required_fragments');
+});
+
+test('Hermes cron verification accepts jobs wired to the runner contract', () => {
+  const configPath = 'data/posthog-growth-engineer/config.json';
+  const workdir = '/srv/example-app';
+  const createCommand = buildHermesCronCreateCommand(configPath, {}, { workdir });
+  const verification = buildHermesCronVerification(configPath, {}, { workdir });
+
+  const parsed = evaluateOpenClawCronRecords(
+    {
+      jobs: [
+        {
+          name: 'Hermes PostHog Growth Engineer scheduler',
+          schedule: '*/30 * * * *',
+          skill: 'growth-engineer',
+          deliver: 'local',
+          workdir,
+          command: createCommand,
+        },
+      ],
+    },
+    verification,
+  );
+
+  assert.equal(parsed.exists, true);
+  assert.equal(parsed.verified, true);
+});
